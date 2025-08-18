@@ -10,14 +10,13 @@ LUCI_PKGARCH:=all
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
-# Define install target
 define Package/luci-app-modeminfo/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/controller
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/view
 
-	# Copy your Lua controller
+	# Copy Lua controller
 	$(CP) ./luasrc/controller/modeminfo.lua $(1)/usr/lib/lua/luci/controller/
 
-	# Copy your HTML view
+	# Copy HTML view
 	$(CP) ./luasrc/view/modeminfo.htm $(1)/usr/lib/lua/luci/view/
 endef
