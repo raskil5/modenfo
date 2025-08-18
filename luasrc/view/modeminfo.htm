@@ -1,0 +1,67 @@
+<%+header%>
+<h2>Modem Info</h2>
+<%
+local nixio = require "nixio"
+
+local function find_at_port()
+  for i = 0, 9 do
+    local dev = "/dev/ttyUSB" .. i
+    local f = nixio.open(dev, "rw")
+    if f then
+      f:write("AT\r\n")
+      nixio.nanosleep(0, 50000000)
+      local out = f:read(1024)  -- non-blocking read
+      f:close()
+      if out and out:match("OK") then return dev end
+    end
+  end
+  return nil
+end
+
+local function query_modem(dev)
+  local function send_at(cmd)
+    local f = nixio.open(dev, "rw")
+    if not f then return nil end
+    f:write(cmd .. "\\r\\n")
+    nixio.nanosleep(0, 50000000)
+    local out = f:read(1024)
+    f:close()
+    return out
+  end
+
+  local info = {}
+  local csq = send_at("AT+CSQ")
+  local cops = send_at("AT+COPS?")
+  local qnw = send_at("AT+QNWINFO")
+
+  if csq and csq:match("+CSQ: (%d+),") then
+    local rssi = tonumber(csq:match("+CSQ: (%d+),"))
+    info.signal = rssi
+    info.dbm = -113 + (rssi * 2)
+  end
+
+  if cops and cops:match('+COPS: .-,"(.-)",(%d)') then
+    info.operator = cops:match('+COPS: .-,"(.-)",')
+    local mode = tonumber(cops:match('+COPS: .-,".-",(%d)'))
+    info.tech = ({ "GSM", "GSM Compact", "UTRAN", "LTE" })[mode + 1] or "Unknown"
+  end
+
+  if qnw and qnw:match("Band") then
+    info.band = qnw:match("Band (%d+)")
+  end
+
+  return info
+end
+
+local dev = find_at_port()
+local info = dev and query_modem(dev) or {}
+%>
+
+<ul>
+  <li><strong>Modem Port:</strong> <%= dev or "Not found" %></li>
+  <li><strong>Operator:</strong> <%= info.operator or "N/A" %></li>
+  <li><strong>Signal:</strong> <%= info.dbm and (info.dbm .. " dBm") or "N/A" %></li>
+  <li><strong>Network:</strong> <%= info.tech or "N/A" %></li>
+  <li><strong>Band:</strong> <%= info.band or "N/A" %></li>
+</ul>
+<%+footer%>
